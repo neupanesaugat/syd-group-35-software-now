@@ -222,4 +222,163 @@ def format_tree(node):
 
     return str(node)
 
+#  EVALUATOR
+
+def evaluate_node(node):
+    """
+    Recursively evaluate an AST node and return a float.
+    Raises ZeroDivisionError for division by zero.
+    """
+    if isinstance(node, float):
+        return node
+
+    if isinstance(node, tuple):
+        if node[0] == 'neg':
+            return -evaluate_node(node[1])
+
+        op, left, right = node
+        l = evaluate_node(left)
+        r = evaluate_node(right)
+
+        if op == '+':  return l + r
+        if op == '-':  return l - r
+        if op == '*':  return l * r
+        if op == '/':
+            if r == 0:
+                raise ZeroDivisionError("Division by zero")
+            return l / r
+
+    raise ValueError(f"Unknown AST node: {node}")
+
+
+def format_result(value):
+    """
+    Format a numeric result for output.
+    Whole numbers are shown without a decimal point (8 not 8.0).
+    Others are rounded to 4 decimal places.
+    """
+    if value == int(value):
+        return str(int(value))
+    return str(round(value, 4))
+
+
+#  OUTPUT HELPERS
+
+def _build_block(expression, tree_str, token_str, result_str):
+    """Assemble the four-line output block for one expression."""
+    return (
+        f"Input: {expression}\n"
+        f"Tree: {tree_str}\n"
+        f"Tokens: {token_str}\n"
+        f"Result: {result_str}"
+    )
+
+
+#  PUBLIC INTERFACE
+
+def evaluate_file(input_path: str) -> list:
+    """
+    Read mathematical expressions from input_path (one per line),
+    evaluate each, write results to `output.txt` in the same directory,
+    and return a list of result dictionaries.
+
+    Parameters
+    ----------
+    input_path : str
+        Path to the input text file.
+
+    Returns
+    -------
+    list[dict]
+        One dictionary per (non-blank) expression with keys:
+        `input`   = original expression string
+        `tree`    - prefix-notation tree string, or "ERROR"
+        `tokens`  -formatted token string, or "ERROR"
+        `result`  - float on success, or "ERROR"
+    """
+    #  resolve output path 
+    output_dir  = os.path.dirname(os.path.abspath(input_path))
+    output_path = os.path.join(output_dir, 'output.txt')
+
+    # read input
+    with open(input_path, 'r') as fh:
+        lines = fh.read().splitlines()
+
+    results       = []
+    output_blocks = []
+
+    for raw_line in lines:
+        expression = raw_line.strip()
+        if not expression:
+            continue                           # skip blank lines
+
+        entry = {'input': expression}
+
+        # tokenise 
+        tokens = tokenise(expression)
+
+        if tokens is None:
+            # Unknown character – all fields are ERROR
+            entry.update({'tokens': 'ERROR', 'tree': 'ERROR', 'result': 'ERROR'})
+            results.append(entry)
+            output_blocks.append(_build_block(expression, 'ERROR', 'ERROR', 'ERROR'))
+            continue
+
+        token_str      = format_tokens(tokens)
+        entry['tokens'] = token_str
+
+        # parse 
+        state = {'tokens': tokens, 'pos': 0}
+        try:
+            tree = _parse_expression(state)
+        except ValueError:
+            entry.update({'tokens': 'ERROR', 'tree': 'ERROR', 'result': 'ERROR'})
+            results.append(entry)
+            output_blocks.append(_build_block(expression, 'ERROR', 'ERROR', 'ERROR'))
+            continue
+
+        tree_str      = format_tree(tree)
+        entry['tree'] = tree_str
+
+        # evaluate
+        try:
+            value          = evaluate_node(tree)
+            result_str     = format_result(value)
+            entry['result'] = float(value)
+        except (ZeroDivisionError, ValueError):
+            
+            result_str      = 'ERROR'
+            entry['result'] = 'ERROR'
+
+        results.append(entry)
+        output_blocks.append(_build_block(expression, tree_str, token_str, result_str))
+
+    # write output file 
+    with open(output_path, 'w') as fh:
+        fh.write('\n\n'.join(output_blocks) + '\n')
+
+    return results
+
+
+#  COMMAND-LINE ENTRY POINT
+
+if __name__ == '__main__':
+    import sys
+
+    if len(sys.argv) < 2:
+        print("Usage: python evaluator.py <input_file>")
+        sys.exit(1)
+
+    path    = sys.argv[1]
+    records = evaluate_file(path)
+
+    for rec in records:
+        print(f"Input:  {rec['input']}")
+        print(f"Tree:   {rec['tree']}")
+        print(f"Tokens: {rec['tokens']}")
+        print(f"Result: {rec['result']}")
+        print()
+
+
+
 
