@@ -1,5 +1,5 @@
-# Question 1 - Part 1
-# Member 1: Encryption functions
+# Question 1 
+# Encryption functions
 
 def encrypt_char(c, shift1, shift2):
     """Encrypt a single character using the assignment rules."""
@@ -67,7 +67,8 @@ def decrypt_text(text, shift1, shift2):
     """Decrypt full text character by character."""
     return "".join(decrypt_char(c, shift1, shift2) for c in text)
  
- 
+#Decryption Function
+
 def decrypt_file(shift1, shift2):
     """Read encrypted_text.txt, decrypt it, write to decrypted_text.txt."""
     try:
